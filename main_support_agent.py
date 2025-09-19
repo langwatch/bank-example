@@ -3,6 +3,7 @@ Main Bank Customer Support Agent - Simple Agno agent with tools
 
 This is the production code - kept very simple. One agent with tools, Agno handles memory.
 """
+
 import os
 import json
 from typing import Dict, Any
@@ -13,29 +14,52 @@ from agno.models.openai import OpenAIChat
 # Import our specialized agents as tools
 from agents.summary_agent import summarize_conversation
 from agents.next_message_agent import suggest_next_message
-from agents.customer_explorer_agent import explore_customer_context, analyze_customer_behavior
+from agents.customer_explorer_agent import (
+    explore_customer_context,
+    analyze_customer_behavior,
+)
 
 dotenv.load_dotenv()
 
 SYSTEM_PROMPT = """
 You are a customer support agent for SecureBank, a modern digital banking platform.
 
-Your role is to help customers with their banking needs professionally and efficiently. You have access to specialized tools that can help you provide better service:
+Your role is to help customers with their banking needs professionally and efficiently. You have access to specialized tools that MUST be used in specific situations:
 
-- Use the conversation summary tool to analyze conversation patterns and sentiment
-- Use the message suggestion tool when you need guidance on complex responses
-- Use the customer exploration tool to get customer data insights and create rich experiences
-- Use the escalation tool when customers need human assistance
+TOOL USAGE REQUIREMENTS:
+
+1. **explore_customer_account** - ALWAYS use when:
+   - Customer mentions fraud, unauthorized transactions, or security concerns
+   - Customer asks about spending patterns, budgeting, or financial analysis
+   - Customer needs account-specific insights or personalized recommendations
+   - Any urgent business account issues that need immediate investigation
+
+2. **get_message_suggestion** - ALWAYS use when:
+   - Customer has complex, multi-part problems (locked accounts + fees + missing deposits)
+   - You need guidance on complex banking regulations or procedures
+   - Customer issue involves multiple interconnected banking services
+
+3. **escalate_to_human** - ALWAYS use when:
+   - Customer explicitly demands to speak with a manager, supervisor, or human agent
+   - Customer expresses extreme frustration or dissatisfaction
+   - Business customer has urgent issues affecting operations (payroll, employee payments)
+   - Set urgency to "high" for business-critical issues
+
+4. **get_conversation_summary** - Use when:
+   - Customer asks you to summarize the conversation
+   - You need to analyze conversation patterns or sentiment
+
+CRITICAL: For simple questions like service hours, do NOT use unnecessary tools. Respond directly.
 
 Guidelines:
 - Be helpful, professional, and empathetic
-- Use tools strategically to enhance your responses
+- Use tools proactively based on the requirements above
 - Provide clear, actionable solutions
-- Escalate appropriately when needed
 - Always prioritize customer security and privacy
 
-Remember: You're here to solve problems and provide excellent customer service.
+Remember: Tool usage is not optional when the situation matches the requirements above.
 """
+
 
 def get_conversation_summary(conversation_context: str = "recent messages") -> str:
     """
@@ -49,12 +73,15 @@ def get_conversation_summary(conversation_context: str = "recent messages") -> s
     """
     # In a real implementation, this would get the actual conversation history
     # For now, we'll simulate with a basic response
-    return json.dumps({
-        "summary": "Conversation analysis requested",
-        "sentiment": "neutral",
-        "key_issues": ["general inquiry"],
-        "suggested_actions": ["continue conversation"]
-    })
+    return json.dumps(
+        {
+            "summary": "Conversation analysis requested",
+            "sentiment": "neutral",
+            "key_issues": ["general inquiry"],
+            "suggested_actions": ["continue conversation"],
+        }
+    )
+
 
 def get_message_suggestion(customer_query: str, context: str = "") -> str:
     """
@@ -72,9 +99,10 @@ def get_message_suggestion(customer_query: str, context: str = "") -> str:
         "suggested_response": f"I understand your concern about: {customer_query}. Let me help you with that.",
         "confidence": "medium",
         "knowledge_sources": ["general_banking_guide"],
-        "alternatives": ["Ask for more details", "Escalate to specialist"]
+        "alternatives": ["Ask for more details", "Escalate to specialist"],
     }
     return json.dumps(suggestion_data)
+
 
 def explore_customer_account(customer_id: str, query: str) -> str:
     """
@@ -93,19 +121,22 @@ def explore_customer_account(customer_id: str, query: str) -> str:
     # Get rich experiences based on query
     rich_experiences = explore_customer_context(customer_id, query)
 
-    return json.dumps({
-        "customer_behavior": behavior,
-        "rich_experiences": [
-            {
-                "type": exp.component_type,
-                "title": exp.title,
-                "data": exp.data,
-                "actions": exp.actions,
-                "priority": exp.priority
-            }
-            for exp in rich_experiences
-        ]
-    })
+    return json.dumps(
+        {
+            "customer_behavior": behavior,
+            "rich_experiences": [
+                {
+                    "type": exp.component_type,
+                    "title": exp.title,
+                    "data": exp.data,
+                    "actions": exp.actions,
+                    "priority": exp.priority,
+                }
+                for exp in rich_experiences
+            ],
+        }
+    )
+
 
 def escalate_to_human(reason: str, urgency: str = "medium") -> str:
     """
@@ -123,9 +154,10 @@ def escalate_to_human(reason: str, urgency: str = "medium") -> str:
         "reason": reason,
         "urgency": urgency,
         "estimated_wait": "5-10 minutes" if urgency == "high" else "10-15 minutes",
-        "message": "I'm connecting you with a specialist who can provide additional assistance."
+        "message": "I'm connecting you with a specialist who can provide additional assistance.",
     }
     return json.dumps(escalation_data)
+
 
 # Create the main support agent
 support_agent = Agent(
@@ -143,16 +175,20 @@ support_agent = Agent(
     add_history_to_context=True,  # Let Agno handle memory
 )
 
+
 # Simple interface for testing
 def chat_with_agent(message: str) -> str:
     """Simple interface to chat with the agent"""
     response = support_agent.run(message)
     return response.content
 
+
 # Example usage
 if __name__ == "__main__":
     print("=== Bank Customer Support Agent ===")
-    print("Agent: Hello! I'm here to help with your banking needs. How can I assist you today?")
+    print(
+        "Agent: Hello! I'm here to help with your banking needs. How can I assist you today?"
+    )
 
     # Simulate a conversation
     customer_message = "Hi, I'm seeing some transactions on my account that I don't recognize. I'm worried about fraud."
