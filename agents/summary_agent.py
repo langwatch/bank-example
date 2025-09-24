@@ -45,6 +45,7 @@ Always respond with a structured summary that helps support agents understand th
 def create_summary_agent() -> Agent:
     """Create and return the summary agent"""
     return Agent(
+        name="SummaryAgent",
         model=OpenAIChat(
             id="gpt-4o-mini",
             api_key=os.getenv("OPENAI_API_KEY"),

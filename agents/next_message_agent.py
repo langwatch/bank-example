@@ -130,6 +130,7 @@ def get_relevant_knowledge(customer_message: str, conversation_context: List[Dic
 def create_next_message_agent() -> Agent:
     """Create and return the next message agent"""
     return Agent(
+        name="NextMessageAgent",
         model=OpenAIChat(
             id="gpt-4o-mini",
             api_key=os.getenv("OPENAI_API_KEY"),

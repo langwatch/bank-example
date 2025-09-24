@@ -115,6 +115,7 @@ def get_customer_data(customer_id: str) -> Optional[CustomerProfile]:
 def create_customer_explorer_agent() -> Agent:
     """Create and return the customer explorer agent"""
     return Agent(
+        name="CustomerExplorerAgent",
         model=OpenAIChat(
             id="gpt-4o-mini",
             api_key=os.getenv("OPENAI_API_KEY"),

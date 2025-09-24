@@ -19,6 +19,13 @@ from agents.customer_explorer_agent import (
     analyze_customer_behavior,
 )
 
+import langwatch
+from openinference.instrumentation.agno import AgnoInstrumentor
+
+langwatch.setup(
+    instrumentors=[AgnoInstrumentor()]
+)
+
 dotenv.load_dotenv()
 
 SYSTEM_PROMPT = """
@@ -161,6 +168,7 @@ def escalate_to_human(reason: str, urgency: str = "medium") -> str:
 
 # Create the main support agent
 support_agent = Agent(
+    name="BankCustomerSupportAgent",
     model=OpenAIChat(
         id="gpt-4o-mini",
         api_key=os.getenv("OPENAI_API_KEY"),
