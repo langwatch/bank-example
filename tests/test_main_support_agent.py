@@ -29,7 +29,7 @@ class BankSupportAgentAdapter(scenario.AgentAdapter):
 
         # Convert Agno messages to OpenAI format for Scenario
         openai_messages = []
-        for message in response.messages:
+        for message in response.messages or []:
             if message.role in ["assistant", "user", "system", "tool"]:
                 msg_dict = {"role": message.role, "content": message.content}
 
@@ -53,7 +53,7 @@ class BankSupportAgentAdapter(scenario.AgentAdapter):
             return relevant_messages
 
         # Fallback to content if no relevant messages found
-        return response.content
+        return response.content  # type: ignore
 
 
 @pytest.mark.agent_test
@@ -121,7 +121,7 @@ async def test_fraud_investigation_workflow():
         ],
     )
 
-    assert result.success, f"Fraud investigation test failed: {result.failure_reason}"
+    assert result.success, f"Fraud investigation test failed: {result.failure_reason}"  # type: ignore
 
 
 @pytest.mark.agent_test
@@ -230,7 +230,7 @@ async def test_escalation_workflow():
         ],
     )
 
-    assert result.success, f"Escalation test failed: {result.failure_reason}"
+    assert result.success, f"Escalation test failed: {result.failure_reason}"  # type: ignore
 
 
 @pytest.mark.agent_test
@@ -306,7 +306,7 @@ async def test_comprehensive_tool_coordination():
         ],
     )
 
-    assert result.success, f"Tool coordination test failed: {result.failure_reason}"
+    assert result.success, f"Tool coordination test failed: {result.failure_reason}"  # type: ignore
 
 
 @pytest.mark.agent_test
@@ -367,7 +367,7 @@ async def test_urgent_business_scenario():
         ],
     )
 
-    assert result.success, f"Urgent business test failed: {result.failure_reason}"
+    assert result.success, f"Urgent business test failed: {result.failure_reason}"  # type: ignore
 
 
 @pytest.mark.agent_test
@@ -381,7 +381,7 @@ async def test_tool_precision_simple_query():
         tool_calls = 0
         for message in state.messages:
             if message["role"] == "assistant" and "tool_calls" in message:
-                tool_calls += len(message["tool_calls"])
+                tool_calls += len(message["tool_calls"])  # type: ignore
 
         # For simple service hours question, should use minimal or no tools
         assert (
@@ -417,7 +417,7 @@ async def test_tool_precision_simple_query():
         ],
     )
 
-    assert result.success, f"Tool precision test failed: {result.failure_reason}"
+    assert result.success, f"Tool precision test failed: {result.failure_reason}"  # type: ignore
 
 
 if __name__ == "__main__":
