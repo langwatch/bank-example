@@ -17,7 +17,7 @@ import scenario
 from main_support_agent import support_agent
 
 dotenv.load_dotenv()
-scenario.configure(default_model="openai/gpt-4o-mini")
+scenario.configure(default_model="nebius/openai/gpt-oss-120b")
 
 
 class BankSupportAgentAdapter(scenario.AgentAdapter):
