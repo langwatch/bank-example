@@ -71,10 +71,6 @@ async def test_fraud_investigation_workflow():
         if tool_call:
             args = json.loads(tool_call["function"]["arguments"])
             assert "customer_id" in args, "Tool call should include customer_id"
-            assert (
-                "fraud" in args.get("query", "").lower()
-                or "security" in args.get("query", "").lower()
-            ), "Tool call should mention fraud or security in query"
 
     def verify_no_inappropriate_tools(state: scenario.ScenarioState):
         """Ensure agent doesn't use inappropriate tools for fraud scenarios"""

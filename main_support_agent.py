@@ -22,9 +22,7 @@ from agents.customer_explorer_agent import (
 import langwatch
 from openinference.instrumentation.agno import AgnoInstrumentor
 
-langwatch.setup(
-    instrumentors=[AgnoInstrumentor()]
-)
+langwatch.setup(instrumentors=[AgnoInstrumentor()])
 
 dotenv.load_dotenv()
 
@@ -78,6 +76,9 @@ def get_conversation_summary(conversation_context: str = "recent messages") -> s
     Returns:
         JSON string with conversation analysis
     """
+    langwatch.get_current_trace().update(
+        metadata={"labels": ["tool_get_conversation_summary"]}
+    )
     # In a real implementation, this would get the actual conversation history
     # For now, we'll simulate with a basic response
     return json.dumps(
@@ -101,6 +102,9 @@ def get_message_suggestion(customer_query: str, context: str = "") -> str:
     Returns:
         JSON string with response suggestions
     """
+    langwatch.get_current_trace().update(
+        metadata={"labels": ["tool_get_message_suggestion"]}
+    )
     # Simulate knowledge base lookup
     suggestion_data = {
         "suggested_response": f"I understand your concern about: {customer_query}. Let me help you with that.",
@@ -127,6 +131,10 @@ def explore_customer_account(customer_id: str, query: str) -> str:
 
     # Get rich experiences based on query
     rich_experiences = explore_customer_context(customer_id, query)
+
+    langwatch.get_current_trace().update(
+        metadata={"labels": ["tool_explore_customer_account"]}
+    )
 
     return json.dumps(
         {
@@ -156,6 +164,8 @@ def escalate_to_human(reason: str, urgency: str = "medium") -> str:
     Returns:
         JSON string with escalation details
     """
+    langwatch.get_current_trace().update(metadata={"labels": ["escalation"]})
+
     escalation_data = {
         "escalated": True,
         "reason": reason,
