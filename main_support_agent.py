@@ -10,6 +10,7 @@ from typing import Dict, Any
 import dotenv
 from agno.agent import Agent
 from agno.models.openai import OpenAIChat
+from agno.models.nebius import Nebius
 
 # Import our specialized agents as tools
 from agents.summary_agent import summarize_conversation
@@ -179,9 +180,13 @@ def escalate_to_human(reason: str, urgency: str = "medium") -> str:
 # Create the main support agent
 support_agent = Agent(
     name="BankCustomerSupportAgent",
-    model=OpenAIChat(
-        id="gpt-4o-mini",
-        api_key=os.getenv("OPENAI_API_KEY"),
+    # model=OpenAIChat(
+    #     id="gpt-4o-mini",
+    #     api_key=os.getenv("OPENAI_API_KEY"),
+    # ),
+    model=Nebius(
+        id="openai/gpt-oss-120b",
+        api_key=os.getenv("NEBIUS_API_KEY"),
     ),
     tools=[
         get_conversation_summary,
