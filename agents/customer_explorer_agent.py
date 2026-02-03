@@ -117,14 +117,14 @@ def create_customer_explorer_agent() -> Agent:
     """Create and return the customer explorer agent"""
     return Agent(
         name="CustomerExplorerAgent",
-        # model=OpenAIChat(
-        #     id="gpt-4o-mini",
-        #     api_key=os.getenv("OPENAI_API_KEY"),
-        # ),
-        model=Nebius(
-            id="openai/gpt-oss-120b",
-            api_key=os.getenv("NEBIUS_API_KEY"),
+        model=OpenAIChat(
+            id="gpt-4o-mini",
+            api_key=os.getenv("OPENAI_API_KEY"),
         ),
+        # model=Nebius(
+        #     id="openai/gpt-oss-120b",
+        #     api_key=os.getenv("NEBIUS_API_KEY"),
+        # ),
         description=CUSTOMER_EXPLORER_SYSTEM_PROMPT,
         add_history_to_context=False,
     )

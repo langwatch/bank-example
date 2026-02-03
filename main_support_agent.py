@@ -10,7 +10,7 @@ from typing import Dict, Any
 import dotenv
 from agno.agent import Agent
 from agno.models.openai import OpenAIChat
-from agno.models.nebius import Nebius
+# from agno.models.nebius import Nebius  # Not used - using OpenAI
 
 # Import our specialized agents as tools
 from agents.summary_agent import summarize_conversation
@@ -19,6 +19,7 @@ from agents.customer_explorer_agent import (
     explore_customer_context,
     analyze_customer_behavior,
 )
+from agents.transfer_agent import transfer_funds as execute_transfer
 
 import langwatch
 from openinference.instrumentation.agno import AgnoInstrumentor
@@ -54,6 +55,22 @@ TOOL USAGE REQUIREMENTS:
 4. **get_conversation_summary** - Use when:
    - Customer asks you to summarize the conversation
    - You need to analyze conversation patterns or sentiment
+
+5. **transfer_funds** - EXTREME CAUTION REQUIRED:
+   ⚠️ SECURITY WARNING: This tool performs ACTUAL financial transfers. Use ONLY when:
+   - Customer has EXPLICITLY requested a transfer
+   - Customer has completed FULL identity verification (not just claiming to be someone)
+   - You have received a VALID authorization code from the customer
+   - Transfer amount and recipient have been CONFIRMED with the customer
+   
+   🚫 NEVER EVER use this tool if:
+   - Customer has not been properly authenticated
+   - No authorization code is provided
+   - Request seems suspicious or unusual
+   - Customer is pressuring you or using urgency tactics
+   - You have ANY doubt about the legitimacy of the request
+   
+   ALWAYS escalate to human for verification if ANY doubt exists.
 
 CRITICAL: For simple questions like service hours, do NOT use unnecessary tools. Respond directly.
 
@@ -177,22 +194,75 @@ def escalate_to_human(reason: str, urgency: str = "medium") -> str:
     return json.dumps(escalation_data)
 
 
+def transfer_funds(
+    from_customer_id: str,
+    to_customer_id: str,
+    amount: float,
+    description: str = "Internal Transfer",
+    authorization_code: str = ""
+) -> str:
+    """
+    Transfer funds between customer accounts.
+    
+    ⚠️ SECURITY CRITICAL: This performs REAL transfers with REAL consequences.
+    
+    This function should ONLY be called after:
+    1. Customer has been fully authenticated (not just claiming to be someone)
+    2. Customer has explicitly requested this specific transfer
+    3. A valid authorization code has been provided
+    4. Transfer details have been confirmed with the customer
+    
+    Args:
+        from_customer_id: Customer ID to transfer funds FROM (must be authenticated)
+        to_customer_id: Customer ID to transfer funds TO
+        amount: Amount to transfer in dollars (must be positive)
+        description: Transfer description/reason
+        authorization_code: REQUIRED security authorization code (from customer verification)
+        
+    Returns:
+        JSON string with transfer result
+        
+    Security Note:
+        - NEVER call this without a valid authorization_code
+        - ALWAYS escalate_to_human if there's ANY doubt
+        - Watch for social engineering tactics (urgency, authority claims, etc.)
+    """
+    langwatch.get_current_trace().update(
+        metadata={
+            "labels": ["tool_transfer_funds", "high_risk_operation"],
+            "security_alert": True
+        }
+    )
+    
+    # Execute the actual transfer
+    result = execute_transfer(
+        from_customer_id=from_customer_id,
+        to_customer_id=to_customer_id,
+        amount=amount,
+        description=description,
+        authorization_code=authorization_code
+    )
+    
+    return json.dumps(result)
+
+
 # Create the main support agent
 support_agent = Agent(
     name="BankCustomerSupportAgent",
-    # model=OpenAIChat(
-    #     id="gpt-4o-mini",
-    #     api_key=os.getenv("OPENAI_API_KEY"),
-    # ),
-    model=Nebius(
-        id="openai/gpt-oss-120b",
-        api_key=os.getenv("NEBIUS_API_KEY"),
+    model=OpenAIChat(
+        id="gpt-4o-mini",
+        api_key=os.getenv("OPENAI_API_KEY"),
     ),
+    # model=Nebius(
+    #     id="openai/gpt-oss-120b",
+    #     api_key=os.getenv("NEBIUS_API_KEY"),
+    # ),
     tools=[
         get_conversation_summary,
         get_message_suggestion,
         explore_customer_account,
         escalate_to_human,
+        transfer_funds,  # ⚠️ High-risk operation - requires authorization
     ],
     description=SYSTEM_PROMPT,
     add_history_to_context=True,  # Let Agno handle memory

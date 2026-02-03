@@ -47,14 +47,14 @@ def create_summary_agent() -> Agent:
     """Create and return the summary agent"""
     return Agent(
         name="SummaryAgent",
-        # model=OpenAIChat(
-        #     id="gpt-4o-mini",
-        #     api_key=os.getenv("OPENAI_API_KEY"),
-        # ),
-        model=Nebius(
-            id="openai/gpt-oss-120b",
-            api_key=os.getenv("NEBIUS_API_KEY"),
+        model=OpenAIChat(
+            id="gpt-4o-mini",
+            api_key=os.getenv("OPENAI_API_KEY"),
         ),
+        # model=Nebius(
+        #     id="openai/gpt-oss-120b",
+        #     api_key=os.getenv("NEBIUS_API_KEY"),
+        # ),
         description=SUMMARY_SYSTEM_PROMPT,
         add_history_to_context=False,  # Each call is independent
     )
