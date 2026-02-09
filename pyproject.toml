@@ -10,5 +10,7 @@ dependencies = [
     "langwatch-scenario>=0.7.11",
     "openinference-instrumentation-agno>=0.1.6",
     "pytest>=8.3.5",
+    "pytest-asyncio>=1.2.0",
+    "pytest-timeout>=2.4.0",
     "python-dotenv>=1.1.0",
 ]
