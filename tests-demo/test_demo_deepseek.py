@@ -1,9 +1,11 @@
 """
-Demo test showing proper Scenario usage with tool call validation - DeepSeek Model
+Tests for the main bank customer support agent - DeepSeek Model
 
-This demonstrates the key capabilities for the customer demo using Nebius DeepSeek model.
+These tests cover real business scenarios and validate tool calling behavior
+using Nebius DeepSeek-V3.2 model for evaluation.
 """
 import asyncio
+import pytest
 import json
 import sys
 import os
@@ -18,162 +20,213 @@ from main_support_agent import support_agent
 dotenv.load_dotenv()
 scenario.configure(default_model="nebius/deepseek-ai/DeepSeek-V3.2")
 
+
 class BankSupportAgentAdapter(scenario.AgentAdapter):
+    """Adapter for our main bank support agent"""
+
     async def call(self, input: scenario.AgentInput) -> scenario.AgentReturnTypes:
         message_content = input.last_new_user_message_str()
         response = support_agent.run(message_content)
-        return response.content
 
-async def test_fraud_with_tool_validation():
-    """
-    Demo test: Fraud investigation with proper tool call validation
+        # Convert Agno messages to OpenAI format for Scenario
+        openai_messages = []
+        for message in response.messages or []:
+            if message.role in ["assistant", "user", "system", "tool"]:
+                msg_dict = {"role": message.role, "content": message.content}
 
-    This shows how Scenario can validate that the right tools are called
-    at the right time for specific business scenarios.
-    """
+                # Add tool calls if present (for assistant messages)
+                if message.tool_calls:
+                    msg_dict["tool_calls"] = message.tool_calls
 
-    def check_fraud_tool_usage(state: scenario.ScenarioState):
-        """Custom assertion to verify fraud investigation tools were used"""
-        print(f"\n🔍 Checking tool calls after {len(state.messages)} messages...")
+                # Add tool call ID if present (for tool messages)
+                if hasattr(message, "tool_call_id") and message.tool_call_id:
+                    msg_dict["tool_call_id"] = message.tool_call_id
 
-        # Check if customer exploration was called
-        has_exploration = state.has_tool_call("explore_customer_account")
-        print(f"   explore_customer_account called: {has_exploration}")
+                openai_messages.append(msg_dict)
 
-        if has_exploration:
-            tool_call = state.last_tool_call("explore_customer_account")
-            if tool_call:
-                args = json.loads(tool_call["function"]["arguments"])
-                print(f"   Tool arguments: {args}")
+        # Return all messages except system and user (Scenario manages the conversation flow)
+        # We need to include tool messages to satisfy OpenAI's requirements
+        relevant_messages = [
+            msg for msg in openai_messages if msg["role"] in ["assistant", "tool"]
+        ]
 
-                # Validate the arguments make sense for fraud
-                query = args.get("query", "").lower()
-                fraud_keywords = ["fraud", "security", "unauthorized", "suspicious"]
-                has_fraud_context = any(keyword in query for keyword in fraud_keywords)
-                print(f"   Query contains fraud context: {has_fraud_context}")
+        if relevant_messages:
+            return relevant_messages
 
-        # For demo purposes, let's be flexible - either exploration or escalation is appropriate
-        has_escalation = state.has_tool_call("escalate_to_human")
-        print(f"   escalate_to_human called: {has_escalation}")
+        # Fallback to content if no relevant messages found
+        return response.content  # type: ignore
 
-        # At least one appropriate tool should be called for fraud concerns
-        appropriate_response = has_exploration or has_escalation
-        print(f"   ✅ Appropriate fraud response: {appropriate_response}")
+@pytest.mark.agent_test
+@pytest.mark.asyncio
+async def test_fraud_investigation_workflow():
+    # Custom assertions for tool calling validation
+    def check_customer_exploration_called(state: scenario.ScenarioState):
+        """Verify the agent called explore_customer_account for fraud investigation"""
+        assert state.has_tool_call(
+            "explore_customer_account"
+        ), "Agent should call explore_customer_account for fraud concerns"
 
-        return appropriate_response
+        # Check the tool was called with appropriate parameters
+        tool_call = state.last_tool_call("explore_customer_account")
+        if tool_call:
+            args = json.loads(tool_call["function"]["arguments"])
+            assert "customer_id" in args, "Tool call should include customer_id"
 
-    print("🎭 Running fraud investigation demo with tool validation (DeepSeek)...")
+    def verify_no_inappropriate_tools(state: scenario.ScenarioState):
+        """Ensure agent doesn't use inappropriate tools for fraud scenarios"""
+        # Should not use message suggestions for clear security issues
+        assert not state.has_tool_call(
+            "get_message_suggestion"
+        ), "Agent should not need message suggestions for clear fraud cases"
 
     result = await scenario.run(
-        name="fraud investigation demo - DeepSeek",
+        name="fraud investigation and card security - DeepSeek",
         description="""
-            Customer reports suspicious transactions and potential fraud.
-            The agent should take this seriously and use appropriate tools
-            to investigate or escalate the security concern.
+            Customer discovers unauthorized transactions on their account and is worried about fraud.
+            They need immediate help to secure their account and investigate the suspicious activity.
+            The agent should use customer exploration tools to analyze the account.
         """,
         agents=[
             BankSupportAgentAdapter(),
             scenario.UserSimulatorAgent(),
-            scenario.JudgeAgent(criteria=[
-                "Agent takes fraud concerns seriously",
-                "Agent offers security measures or investigation",
-                "Agent maintains professional and reassuring tone"
-            ])
+            scenario.JudgeAgent(
+                criteria=[
+                    "Agent takes fraud concerns seriously and responds with urgency",
+                    "Agent offers concrete security actions like card freezing",
+                    "Agent provides clear next steps for fraud investigation",
+                    "Agent maintains professional and reassuring tone",
+                ]
+            ),
         ],
         script=[
-            scenario.user("I think someone stole my card! There are charges I didn't make - $85 at Amazon and $45 at a gas station."),
+            scenario.user(
+                "Hi, I just checked my account and there are transactions I didn't make. I think my card was stolen!"
+            ),
             scenario.agent(),
-            check_fraud_tool_usage,
-            scenario.user("Yes, please help me secure my account immediately!"),
+            check_customer_exploration_called,
+            scenario.user(
+                "There's an $85 charge at Amazon and a $45 charge at some gas station. I definitely didn't make these purchases."
+            ),
+            scenario.agent(),
+            scenario.user(
+                "Yes, please help me secure my account right away. I'm worried about more charges."
+            ),
+            scenario.agent(),
+            verify_no_inappropriate_tools,
+            scenario.judge(),
+        ],
+    )
+
+    assert result.success, f"Fraud investigation test failed: {result.failure_reason}"  # type: ignore
+
+@pytest.mark.agent_test
+@pytest.mark.asyncio
+async def test_escalation_workflow():
+    def check_escalation_called(state: scenario.ScenarioState):
+        """Verify agent escalates when customer explicitly demands human help"""
+        assert state.has_tool_call(
+            "escalate_to_human"
+        ), "Agent should escalate when customer demands manager/human help"
+
+        tool_call = state.last_tool_call("escalate_to_human")
+        if tool_call:
+            args = json.loads(tool_call["function"]["arguments"])
+            reason = args.get("reason", "").lower()
+            assert any(
+                keyword in reason
+                for keyword in ["frustrated", "manager", "human", "escalation"]
+            ), "Escalation reason should reflect customer's frustration and demand"
+
+    result = await scenario.run(
+        name="customer escalation to human agent - DeepSeek",
+        description="""
+            Customer has been dealing with an ongoing issue and is frustrated.
+            They explicitly demand to speak with a human agent or manager.
+            The agent should handle this professionally and escalate appropriately.
+        """,
+        agents=[
+            BankSupportAgentAdapter(),
+            scenario.UserSimulatorAgent(),
+            scenario.JudgeAgent(
+                criteria=[
+                    "Agent acknowledges customer's frustration empathetically",
+                    "Agent offers to escalate when requested",
+                    "Agent provides escalation timeline and process information",
+                    "Agent maintains professionalism despite customer frustration",
+                ]
+            ),
+        ],
+        script=[
+            scenario.user(
+                "I've been calling about this same issue for two weeks and nobody can fix it. I want to speak to a real person who can actually help me!"
+            ),
+            scenario.agent(),
+            scenario.user(
+                "No more troubleshooting! I want a manager or supervisor right now. This is unacceptable service."
+            ),
+            scenario.agent(),
+            check_escalation_called,
+            scenario.judge(),
+        ],
+    )
+
+    assert result.success, f"Escalation test failed: {result.failure_reason}"  # type: ignore
+
+
+@pytest.mark.agent_test
+@pytest.mark.asyncio
+async def test_complex_issue_triggers_knowledge_base():
+    def check_message_suggestion_called(state: scenario.ScenarioState):
+        """Verify agent uses knowledge base for complex multi-part issues"""
+        assert state.has_tool_call(
+            "get_message_suggestion"
+        ), "Agent should use message suggestions for complex banking issues"
+
+        tool_call = state.last_tool_call("get_message_suggestion")
+        if tool_call:
+            args = json.loads(tool_call["function"]["arguments"])
+            query = args.get("customer_query", "").lower()
+            assert any(
+                keyword in query for keyword in ["lock", "fee", "deposit", "multiple"]
+            ), "Tool call should reference the customer's specific issues"
+
+    result = await scenario.run(
+        name="complex multi-issue banking problem - DeepSeek",
+        description="""
+            Customer has multiple interconnected banking problems: locked online banking,
+            unexpected fees, and missing direct deposit. They need systematic help
+            and the agent should use knowledge base guidance.
+        """,
+        agents=[
+            BankSupportAgentAdapter(),
+            scenario.UserSimulatorAgent(),
+            scenario.JudgeAgent(
+                criteria=[
+                    "Agent addresses all parts of the multi-faceted problem",
+                    "Agent provides systematic approach to resolving issues",
+                    "Agent shows empathy for customer frustration",
+                    "Agent offers clear next steps for each problem",
+                ]
+            ),
+        ],
+        script=[
+            scenario.user(
+                "I have multiple problems with my account. My online banking is locked, there's a $35 fee I don't understand, and my paycheck didn't deposit."
+            ),
+            scenario.agent(),
+            check_message_suggestion_called,
+            scenario.user(
+                "I've tried resetting my password multiple times and I really need access to pay my bills. This is really stressing me out."
+            ),
             scenario.agent(),
             scenario.judge(),
         ],
     )
 
-    print(f"\n📊 Test Result: {'✅ PASSED' if result.success else '❌ FAILED'}")
-    if result.reasoning:
-        print(f"Reasoning: {result.reasoning}")
+    assert (
+        result.success
+    ), f"Complex issue test failed: {result.reasoning if hasattr(result, 'reasoning') else 'No failure reason available'}"
 
-    return result.success
-
-async def test_escalation_detection():
-    """
-    Demo test: Escalation detection with custom validation
-    """
-
-    def verify_escalation_logic(state: scenario.ScenarioState):
-        """Check that angry customers trigger escalation"""
-        print(f"\n🚨 Checking escalation logic...")
-
-        has_escalation = state.has_tool_call("escalate_to_human")
-        print(f"   escalate_to_human called: {has_escalation}")
-
-        if has_escalation:
-            tool_call = state.last_tool_call("escalate_to_human")
-            if tool_call:
-                args = json.loads(tool_call["function"]["arguments"])
-                reason = args.get("reason", "")
-                urgency = args.get("urgency", "medium")
-                print(f"   Escalation reason: {reason}")
-                print(f"   Urgency level: {urgency}")
-
-        print(f"   ✅ Escalation handled: {has_escalation}")
-        return has_escalation
-
-    print("\n🎭 Running escalation detection demo (DeepSeek)...")
-
-    result = await scenario.run(
-        name="escalation detection demo - DeepSeek",
-        description="""
-            Frustrated customer demands to speak with a manager.
-            Agent should recognize the escalation need and handle appropriately.
-        """,
-        agents=[
-            BankSupportAgentAdapter(),
-            scenario.UserSimulatorAgent(),
-            scenario.JudgeAgent(criteria=[
-                "Agent acknowledges customer frustration",
-                "Agent offers escalation when demanded",
-                "Agent maintains professionalism"
-            ])
-        ],
-        script=[
-            scenario.user("This is ridiculous! I want to speak to your manager RIGHT NOW! Nobody can help me with this issue!"),
-            scenario.agent(),
-            verify_escalation_logic,
-            scenario.judge(),
-        ],
-    )
-
-    print(f"\n📊 Test Result: {'✅ PASSED' if result.success else '❌ FAILED'}")
-    return result.success
-
-async def main():
-    """Run the demo tests"""
-    print("🚀 Bank Customer Support Agent - Scenario Demo (DeepSeek)")
-    print("=" * 50)
-
-    # Test 1: Fraud Investigation
-    fraud_passed = await test_fraud_with_tool_validation()
-
-    # Test 2: Escalation Detection
-    escalation_passed = await test_escalation_detection()
-
-    print("\n" + "=" * 50)
-    print("📈 Demo Summary:")
-    print(f"   Fraud Investigation: {'✅ PASSED' if fraud_passed else '❌ FAILED'}")
-    print(f"   Escalation Detection: {'✅ PASSED' if escalation_passed else '❌ FAILED'}")
-
-    overall_success = fraud_passed and escalation_passed
-    print(f"\n🎯 Overall Demo: {'✅ SUCCESS' if overall_success else '❌ NEEDS WORK'}")
-
-    if overall_success:
-        print("\n🎉 Demo ready! This shows:")
-        print("   • Proper Scenario framework usage")
-        print("   • Tool calling validation")
-        print("   • Custom assertions for business logic")
-        print("   • Realistic user simulation")
-        print("   • Automated quality assessment")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(test_fraud_investigation_workflow())
