@@ -2,7 +2,7 @@
 Tests for the main bank customer support agent - OpenAI Model
 
 These tests cover real business scenarios and validate tool calling behavior
-using OpenAI gpt-4o-mini model for evaluation.
+using OpenAI claude-sonnet-4.5-mini model for evaluation.
 """
 import asyncio
 import pytest
@@ -18,7 +18,7 @@ import scenario
 from main_support_agent import support_agent
 
 dotenv.load_dotenv()
-scenario.configure(default_model="gpt-4o")
+scenario.configure(default_model="openai/gpt-oss-120b")
 
 
 class BankSupportAgentAdapter(scenario.AgentAdapter):
@@ -69,9 +69,9 @@ async def test_fraud_investigation_workflow():
         """,
         agents=[
             BankSupportAgentAdapter(),
-            scenario.UserSimulatorAgent(),
+            scenario.UserSimulatorAgent(model="claude-sonnet-4.5"),
             scenario.JudgeAgent(
-                model="gpt-4o",
+                model="claude-sonnet-4.5",
                 criteria=[
                     "Agent takes fraud concerns seriously and responds with urgency",
                     "Agent gathers necessary information (account details) to investigate",
@@ -128,9 +128,9 @@ async def test_escalation_workflow():
         """,
         agents=[
             BankSupportAgentAdapter(),
-            scenario.UserSimulatorAgent(),
+            scenario.UserSimulatorAgent(model="claude-sonnet-4.5"),
             scenario.JudgeAgent(
-                model="gpt-4o",
+                model="claude-sonnet-4.5",
                 criteria=[
                     "Agent acknowledges customer's frustration empathetically",
                     "Agent offers to escalate when requested",
@@ -168,9 +168,9 @@ async def test_complex_issue_triggers_knowledge_base():
         """,
         agents=[
             BankSupportAgentAdapter(),
-            scenario.UserSimulatorAgent(),
+            scenario.UserSimulatorAgent(model="claude-sonnet-4.5"),
             scenario.JudgeAgent(
-                model="gpt-4o",
+                model="claude-sonnet-4.5",
                 criteria=[
                     "Agent acknowledges ALL three issues (locked banking, fee, missing deposit)",
                     "Agent provides systematic approach with clear steps for each issue",
@@ -210,9 +210,9 @@ async def test_urgent_business_scenario():
         """,
         agents=[
             BankSupportAgentAdapter(),
-            scenario.UserSimulatorAgent(),
+            scenario.UserSimulatorAgent(model="claude-sonnet-4.5"),
             scenario.JudgeAgent(
-                model="gpt-4o",
+                model="claude-sonnet-4.5",
                 criteria=[
                     "Agent immediately recognizes the business urgency and employee impact",
                     "Agent responds with high priority and urgency in tone",
