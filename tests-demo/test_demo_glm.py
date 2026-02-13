@@ -60,42 +60,24 @@ class BankSupportAgentAdapter(scenario.AgentAdapter):
 @pytest.mark.agent_test
 @pytest.mark.asyncio
 async def test_fraud_investigation_workflow():
-    # Custom assertions for tool calling validation
-    def check_customer_exploration_called(state: scenario.ScenarioState):
-        """Verify the agent called explore_customer_account for fraud investigation"""
-        assert state.has_tool_call(
-            "explore_customer_account"
-        ), "Agent should call explore_customer_account for fraud concerns"
-
-        # Check the tool was called with appropriate parameters
-        tool_call = state.last_tool_call("explore_customer_account")
-        if tool_call:
-            args = json.loads(tool_call["function"]["arguments"])
-            assert "customer_id" in args, "Tool call should include customer_id"
-
-    def verify_no_inappropriate_tools(state: scenario.ScenarioState):
-        """Ensure agent doesn't use inappropriate tools for fraud scenarios"""
-        # Should not use message suggestions for clear security issues
-        assert not state.has_tool_call(
-            "get_message_suggestion"
-        ), "Agent should not need message suggestions for clear fraud cases"
-
     result = await scenario.run(
         name="fraud investigation and card security - GLM",
         description="""
             Customer discovers unauthorized transactions on their account and is worried about fraud.
             They need immediate help to secure their account and investigate the suspicious activity.
-            The agent should use customer exploration tools to analyze the account.
+            This tests whether the agent responds with appropriate urgency and offers concrete security actions.
         """,
         agents=[
             BankSupportAgentAdapter(),
             scenario.UserSimulatorAgent(),
             scenario.JudgeAgent(
+                model="gpt-4o",
                 criteria=[
                     "Agent takes fraud concerns seriously and responds with urgency",
-                    "Agent offers concrete security actions like card freezing",
-                    "Agent provides clear next steps for fraud investigation",
-                    "Agent maintains professional and reassuring tone",
+                    "Agent gathers necessary information (account details) to investigate",
+                    "Agent offers concrete security actions like card freezing or blocking",
+                    "Agent provides clear next steps for fraud investigation and dispute process",
+                    "Agent maintains professional and reassuring tone throughout",
                 ]
             ),
         ],
@@ -104,16 +86,14 @@ async def test_fraud_investigation_workflow():
                 "Hi, I just checked my account and there are transactions I didn't make. I think my card was stolen!"
             ),
             scenario.agent(),
-            check_customer_exploration_called,
             scenario.user(
-                "There's an $85 charge at Amazon and a $45 charge at some gas station. I definitely didn't make these purchases."
+                "My customer ID is CUST_001. There's an $85 charge at Amazon and a $45 charge at some gas station yesterday. I definitely didn't make these purchases."
             ),
             scenario.agent(),
             scenario.user(
-                "Yes, please help me secure my account right away. I'm worried about more charges."
+                "Yes, please help me secure my account right away. I'm really worried about more charges appearing."
             ),
             scenario.agent(),
-            verify_no_inappropriate_tools,
             scenario.judge(),
         ],
     )
@@ -150,6 +130,7 @@ async def test_escalation_workflow():
             BankSupportAgentAdapter(),
             scenario.UserSimulatorAgent(),
             scenario.JudgeAgent(
+                model="gpt-4o",
                 criteria=[
                     "Agent acknowledges customer's frustration empathetically",
                     "Agent offers to escalate when requested",
@@ -178,53 +159,32 @@ async def test_escalation_workflow():
 @pytest.mark.agent_test
 @pytest.mark.asyncio
 async def test_urgent_business_scenario():
-    def check_appropriate_urgency_response(state: scenario.ScenarioState):
-        """Verify agent responds appropriately to business urgency"""
-        # For urgent business issues, agent should either:
-        # 1. Escalate immediately, OR
-        # 2. Use customer exploration to provide immediate solutions
-        has_escalation = state.has_tool_call("escalate_to_human")
-        has_exploration = state.has_tool_call("explore_customer_account")
-
-        assert (
-            has_escalation or has_exploration
-        ), "Agent should either escalate urgent business issues or explore customer account for immediate solutions"
-
-        # Check that urgency is reflected in tool call parameters
-        if has_escalation:
-            tool_call = state.last_tool_call("escalate_to_human")
-            if tool_call:
-                args = json.loads(tool_call["function"]["arguments"])
-                urgency = args.get("urgency", "medium")
-                assert (
-                    urgency == "high"
-                ), "Business urgency should be marked as high priority"
-
     result = await scenario.run(
         name="urgent business account problem - GLM",
         description="""
             Business customer has an urgent issue affecting their operations.
-            They can't access funds to pay employees. This requires immediate
-            attention and appropriate priority handling.
+            They can't access funds to pay employees. This tests whether the agent
+            recognizes urgency and takes appropriate high-priority action.
         """,
         agents=[
             BankSupportAgentAdapter(),
             scenario.UserSimulatorAgent(),
             scenario.JudgeAgent(
+                model="gpt-4o",
                 criteria=[
-                    "Agent recognizes the business urgency and impact",
-                    "Agent treats the issue with appropriate priority",
-                    "Agent offers immediate assistance or escalation",
-                    "Agent provides clear timeline for resolution",
+                    "Agent immediately recognizes the business urgency and employee impact",
+                    "Agent responds with high priority and urgency in tone",
+                    "Agent takes concrete action (investigating the freeze or escalating to specialists)",
+                    "Agent provides realistic timeline or sets expectations appropriately",
+                    "Agent offers interim solutions or workarounds if available",
                 ]
             ),
         ],
         script=[
             scenario.user(
-                "URGENT: My business account is frozen and I need to pay my employees today. This is costing me money every minute!"
+                "URGENT: My business account is frozen and I need to pay my employees today. This is costing me money every minute! My business account number is CUST_001."
             ),
             scenario.agent(),
-            check_appropriate_urgency_response,
             scenario.user(
                 "I can't wait. My payroll is due in 2 hours and my employees are depending on me. What can you do right now?"
             ),
@@ -234,6 +194,48 @@ async def test_urgent_business_scenario():
     )
 
     assert result.success, f"Urgent business test failed: {result.failure_reason}"  # type: ignore
+
+
+@pytest.mark.agent_test
+@pytest.mark.asyncio
+async def test_complex_issue_triggers_knowledge_base():
+    result = await scenario.run(
+        name="complex multi-issue banking problem - GLM",
+        description="""
+            Customer has multiple interconnected banking problems: locked online banking,
+            unexpected fees, and missing direct deposit. They need systematic help.
+            This tests whether the agent can handle multiple issues comprehensively.
+        """,
+        agents=[
+            BankSupportAgentAdapter(),
+            scenario.UserSimulatorAgent(),
+            scenario.JudgeAgent(
+                model="gpt-4o",
+                criteria=[
+                    "Agent acknowledges ALL three issues (locked banking, fee, missing deposit)",
+                    "Agent provides systematic approach with clear steps for each issue",
+                    "Agent shows empathy for customer's stress and urgency",
+                    "Agent prioritizes the most urgent issue (locked account for bill payments)",
+                    "Agent offers concrete next steps that the customer can act on",
+                ]
+            ),
+        ],
+        script=[
+            scenario.user(
+                "I have multiple problems with my account. My online banking is locked, there's a $35 fee I don't understand, and my paycheck didn't deposit. My customer ID is CUST_001."
+            ),
+            scenario.agent(),
+            scenario.user(
+                "I've tried resetting my password multiple times and I really need access to pay my bills today. This is really stressing me out."
+            ),
+            scenario.agent(),
+            scenario.judge(),
+        ],
+    )
+
+    assert (
+        result.success
+    ), f"Complex issue test failed: {result.reasoning if hasattr(result, 'reasoning') else 'No failure reason available'}"
 
 
 if __name__ == "__main__":

@@ -1,8 +1,8 @@
 """
-Tests for the main bank customer support agent - OpenAI Model
+Tests for the main bank customer support agent - Claude Sonnet 4.5 Model
 
 These tests cover real business scenarios and validate tool calling behavior
-using OpenAI gpt-4o-mini model for evaluation.
+using Claude Sonnet 4.5 model for evaluation.
 """
 import asyncio
 import pytest
@@ -18,7 +18,7 @@ import scenario
 from main_support_agent import support_agent
 
 dotenv.load_dotenv()
-scenario.configure(default_model="gpt-4o")
+scenario.configure(default_model="claude-sonnet-4.5")
 
 
 class BankSupportAgentAdapter(scenario.AgentAdapter):
@@ -61,7 +61,7 @@ class BankSupportAgentAdapter(scenario.AgentAdapter):
 @pytest.mark.asyncio
 async def test_fraud_investigation_workflow():
     result = await scenario.run(
-        name="fraud investigation and card security - OpenAI",
+        name="fraud investigation and card security - Claude",
         description="""
             Customer discovers unauthorized transactions on their account and is worried about fraud.
             They need immediate help to secure their account and investigate the suspicious activity.
@@ -120,7 +120,7 @@ async def test_escalation_workflow():
             ), "Escalation reason should reflect customer's frustration and demand"
 
     result = await scenario.run(
-        name="customer escalation to human agent - OpenAI",
+        name="customer escalation to human agent - Claude",
         description="""
             Customer has been dealing with an ongoing issue and is frustrated.
             They explicitly demand to speak with a human agent or manager.
@@ -160,7 +160,7 @@ async def test_escalation_workflow():
 @pytest.mark.asyncio
 async def test_complex_issue_triggers_knowledge_base():
     result = await scenario.run(
-        name="complex multi-issue banking problem - OpenAI",
+        name="complex multi-issue banking problem - Claude",
         description="""
             Customer has multiple interconnected banking problems: locked online banking,
             unexpected fees, and missing direct deposit. They need systematic help.
@@ -202,7 +202,7 @@ async def test_complex_issue_triggers_knowledge_base():
 @pytest.mark.asyncio
 async def test_urgent_business_scenario():
     result = await scenario.run(
-        name="urgent business account problem - OpenAI",
+        name="urgent business account problem - Claude",
         description="""
             Business customer has an urgent issue affecting their operations.
             They can't access funds to pay employees. This tests whether the agent
