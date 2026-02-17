@@ -1,5 +1,5 @@
 """
-Main Bank Customer Support Agent - Simple Agno agent with tools
+Main Bank Customer Support Agent - OpenAI GPT-OSS-120B Model
 
 This is the production code - kept very simple. One agent with tools, Agno handles memory.
 """
@@ -9,8 +9,13 @@ import json
 from typing import Dict, Any
 import dotenv
 from agno.agent import Agent
-from agno.models.openai import OpenAIChat
 from agno.models.nebius import Nebius
+
+import agent_config
+
+dotenv.load_dotenv()
+
+agent_config.set_model(Nebius(id="openai/gpt-oss-120b", api_key=os.getenv("NEBIUS_API_KEY")))
 
 # Import our specialized agents as tools
 from agents.summary_agent import summarize_conversation
@@ -24,8 +29,6 @@ import langwatch
 from openinference.instrumentation.agno import AgnoInstrumentor
 
 langwatch.setup(instrumentors=[AgnoInstrumentor()])
-
-dotenv.load_dotenv()
 
 SYSTEM_PROMPT = """
 You are a customer support agent for SecureBank, a modern digital banking platform.
@@ -180,10 +183,6 @@ def escalate_to_human(reason: str, urgency: str = "medium") -> str:
 # Create the main support agent
 support_agent = Agent(
     name="BankCustomerSupportAgent",
-    # model=OpenAIChat(
-    #     id="gpt-4o-mini",
-    #     api_key=os.getenv("OPENAI_API_KEY"),
-    # ),
     model=Nebius(
         id="openai/gpt-oss-120b",
         api_key=os.getenv("NEBIUS_API_KEY"),

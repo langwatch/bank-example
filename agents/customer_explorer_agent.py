@@ -6,9 +6,11 @@ from typing import List, Dict, Any, Optional
 import dotenv
 from agno.agent import Agent
 from agno.models.openai import OpenAIChat
+from agno.models.nebius import Nebius
 from pydantic import BaseModel
 from datetime import datetime, timedelta
 import json
+import agent_config
 
 dotenv.load_dotenv()
 
@@ -116,12 +118,9 @@ def create_customer_explorer_agent() -> Agent:
     """Create and return the customer explorer agent"""
     return Agent(
         name="CustomerExplorerAgent",
-        model=OpenAIChat(
-            id="gpt-4o-mini",
-            api_key=os.getenv("OPENAI_API_KEY"),
-        ),
+        model=agent_config.get_model(),
         description=CUSTOMER_EXPLORER_SYSTEM_PROMPT,
-        add_history_to_context=False,
+        add_history_to_context=True,
     )
 
 def explore_customer_context(
