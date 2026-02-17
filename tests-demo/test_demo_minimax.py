@@ -15,10 +15,64 @@ import dotenv
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import scenario
-from main_support_agent import support_agent
+from main_support_agent_minimax import support_agent
 
 dotenv.load_dotenv()
-scenario.configure(default_model="nebius/MiniMaxAI/MiniMax-M2.1")
+scenario.configure(default_model="openai/gpt-4o")
+
+
+def _parse_tool_arguments(tool_call: dict) -> dict:
+    raw_args = tool_call["function"].get("arguments", {})
+    if isinstance(raw_args, dict):
+        return raw_args
+    if isinstance(raw_args, str):
+        try:
+            return json.loads(raw_args)
+        except json.JSONDecodeError:
+            return {}
+    return {}
+
+
+def _assert_success(result: scenario.ScenarioResult, test_name: str) -> None:
+    assert result.success, f"{test_name} failed: {result.reasoning or 'No failure reasoning returned'}"
+
+
+def _build_tool_trace_messages(response) -> list[dict]:
+    messages: list[dict] = []
+    for i, tool in enumerate(response.tools or []):
+        tool_call_id = tool.tool_call_id or f"tool_call_{i}"
+        tool_name = tool.tool_name or "unknown_tool"
+        tool_args = tool.tool_args if isinstance(tool.tool_args, dict) else {}
+        tool_result = tool.result if isinstance(tool.result, str) else json.dumps(tool.result or {})
+
+        messages.append(
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": tool_call_id,
+                        "type": "function",
+                        "function": {
+                            "name": tool_name,
+                            "arguments": json.dumps(tool_args),
+                        },
+                    }
+                ],
+            }
+        )
+        messages.append(
+            {
+                "role": "tool",
+                "tool_call_id": tool_call_id,
+                "content": tool_result,
+            }
+        )
+
+    if isinstance(response.content, str) and response.content:
+        messages.append({"role": "assistant", "content": response.content})
+
+    return messages
 
 
 class BankSupportAgentAdapter(scenario.AgentAdapter):
@@ -51,7 +105,15 @@ class BankSupportAgentAdapter(scenario.AgentAdapter):
         ]
 
         if relevant_messages:
-            return relevant_messages
+            has_tool_calls = any(
+                msg["role"] == "assistant" and "tool_calls" in msg for msg in relevant_messages
+            )
+            if has_tool_calls:
+                return relevant_messages
+
+        synthetic_messages = _build_tool_trace_messages(response)
+        if synthetic_messages:
+            return synthetic_messages
 
         # Fallback to content if no relevant messages found
         return response.content  # type: ignore
@@ -69,15 +131,16 @@ async def test_fraud_investigation_workflow():
         """,
         agents=[
             BankSupportAgentAdapter(),
-            scenario.UserSimulatorAgent(model="claude-sonnet-4.5"),
+            scenario.UserSimulatorAgent(model="openai/gpt-4o"),
             scenario.JudgeAgent(
-                model="claude-sonnet-4.5",
+                model="openai/gpt-4o",
                 criteria=[
                     "Agent takes fraud concerns seriously and responds with urgency",
                     "Agent gathers necessary information (account details) to investigate",
                     "Agent offers concrete security actions like card freezing or blocking",
                     "Agent provides clear next steps for fraud investigation and dispute process",
                     "Agent maintains professional and reassuring tone throughout",
+                    "Agent does not re-ask for customer ID that was already provided",
                 ]
             ),
         ],
@@ -98,7 +161,7 @@ async def test_fraud_investigation_workflow():
         ],
     )
 
-    assert result.success, f"Fraud investigation test failed: {result.failure_reason}"  # type: ignore
+    _assert_success(result, "Fraud investigation test")
 
 
 @pytest.mark.agent_test
@@ -112,7 +175,7 @@ async def test_escalation_workflow():
 
         tool_call = state.last_tool_call("escalate_to_human")
         if tool_call:
-            args = json.loads(tool_call["function"]["arguments"])
+            args = _parse_tool_arguments(tool_call)
             reason = args.get("reason", "").lower()
             assert any(
                 keyword in reason
@@ -128,9 +191,9 @@ async def test_escalation_workflow():
         """,
         agents=[
             BankSupportAgentAdapter(),
-            scenario.UserSimulatorAgent(model="claude-sonnet-4.5"),
+            scenario.UserSimulatorAgent(model="openai/gpt-4o"),
             scenario.JudgeAgent(
-                model="claude-sonnet-4.5",
+                model="openai/gpt-4o",
                 criteria=[
                     "Agent acknowledges customer's frustration empathetically",
                     "Agent offers to escalate when requested",
@@ -153,7 +216,7 @@ async def test_escalation_workflow():
         ],
     )
 
-    assert result.success, f"Escalation test failed: {result.failure_reason}"  # type: ignore
+    _assert_success(result, "Escalation test")
 
 
 @pytest.mark.agent_test
@@ -168,9 +231,9 @@ async def test_complex_issue_triggers_knowledge_base():
         """,
         agents=[
             BankSupportAgentAdapter(),
-            scenario.UserSimulatorAgent(model="claude-sonnet-4.5"),
+            scenario.UserSimulatorAgent(model="openai/gpt-4o"),
             scenario.JudgeAgent(
-                model="claude-sonnet-4.5",
+                model="openai/gpt-4o",
                 criteria=[
                     "Agent acknowledges ALL three issues (locked banking, fee, missing deposit)",
                     "Agent provides systematic approach with clear steps for each issue",
@@ -193,9 +256,7 @@ async def test_complex_issue_triggers_knowledge_base():
         ],
     )
 
-    assert (
-        result.success
-    ), f"Complex issue test failed: {result.reasoning if hasattr(result, 'reasoning') else 'No failure reason available'}"
+    _assert_success(result, "Complex issue test")
 
 
 @pytest.mark.agent_test
@@ -210,9 +271,9 @@ async def test_urgent_business_scenario():
         """,
         agents=[
             BankSupportAgentAdapter(),
-            scenario.UserSimulatorAgent(model="claude-sonnet-4.5"),
+            scenario.UserSimulatorAgent(model="openai/gpt-4o"),
             scenario.JudgeAgent(
-                model="claude-sonnet-4.5",
+                model="openai/gpt-4o",
                 criteria=[
                     "Agent immediately recognizes the business urgency and employee impact",
                     "Agent responds with high priority and urgency in tone",
@@ -235,7 +296,157 @@ async def test_urgent_business_scenario():
         ],
     )
 
-    assert result.success, f"Urgent business test failed: {result.failure_reason}"  # type: ignore
+    _assert_success(result, "Urgent business test")
+
+
+@pytest.mark.agent_test
+@pytest.mark.asyncio
+async def test_simple_inquiry_no_tools():
+    result = await scenario.run(
+        name="simple inquiry without tool usage - MiniMax",
+        description="""
+            Customer asks a simple question about branch hours or general banking info.
+            The agent should answer directly without invoking any tools.
+        """,
+        agents=[
+            BankSupportAgentAdapter(),
+            scenario.UserSimulatorAgent(model="openai/gpt-4o"),
+            scenario.JudgeAgent(
+                model="openai/gpt-4o",
+                criteria=[
+                    "Agent answers the simple question directly and helpfully",
+                    "Agent does not over-complicate the response",
+                    "Agent maintains a friendly and professional tone",
+                ]
+            ),
+        ],
+        script=[
+            scenario.user(
+                "What are your customer support hours? I just want to know when I can call if I have an issue."
+            ),
+            scenario.agent(),
+            scenario.judge(),
+        ],
+    )
+
+    _assert_success(result, "Simple inquiry test")
+
+
+@pytest.mark.agent_test
+@pytest.mark.asyncio
+async def test_spending_analysis_request():
+    result = await scenario.run(
+        name="spending analysis and budgeting help - MiniMax",
+        description="""
+            Customer wants to understand their spending patterns and get budgeting advice.
+            The agent should use explore_customer_account to analyze their transactions.
+        """,
+        agents=[
+            BankSupportAgentAdapter(),
+            scenario.UserSimulatorAgent(model="openai/gpt-4o"),
+            scenario.JudgeAgent(
+                model="openai/gpt-4o",
+                criteria=[
+                    "Agent uses account exploration tools to analyze spending",
+                    "Agent provides specific insights about spending categories",
+                    "Agent offers actionable budgeting advice or recommendations",
+                    "Agent is helpful and non-judgmental about spending habits",
+                ]
+            ),
+        ],
+        script=[
+            scenario.user(
+                "My customer ID is CUST_001. I feel like I'm spending too much lately. Can you help me understand where my money is going?"
+            ),
+            scenario.agent(),
+            scenario.user(
+                "That's really helpful. Are there any areas where you think I could cut back?"
+            ),
+            scenario.agent(),
+            scenario.judge(),
+        ],
+    )
+
+    _assert_success(result, "Spending analysis test")
+
+
+@pytest.mark.agent_test
+@pytest.mark.asyncio
+async def test_lost_card_replacement():
+    result = await scenario.run(
+        name="lost card replacement workflow - MiniMax",
+        description="""
+            Customer has lost their debit card and needs a replacement.
+            Tests whether the agent handles the card replacement process properly
+            including immediate security measures.
+        """,
+        agents=[
+            BankSupportAgentAdapter(),
+            scenario.UserSimulatorAgent(model="openai/gpt-4o"),
+            scenario.JudgeAgent(
+                model="openai/gpt-4o",
+                criteria=[
+                    "Agent treats lost card with appropriate urgency",
+                    "Agent suggests freezing or blocking the lost card immediately",
+                    "Agent explains the replacement card process and timeline",
+                    "Agent asks about any unauthorized transactions since the card was lost",
+                    "Agent reassures the customer about account security",
+                ]
+            ),
+        ],
+        script=[
+            scenario.user(
+                "I lost my debit card somewhere yesterday. I've looked everywhere and can't find it. My customer ID is CUST_001."
+            ),
+            scenario.agent(),
+            scenario.user(
+                "I don't think anyone has used it, but I'm not sure. Can you check and get me a new card?"
+            ),
+            scenario.agent(),
+            scenario.judge(),
+        ],
+    )
+
+    _assert_success(result, "Lost card replacement test")
+
+
+@pytest.mark.agent_test
+@pytest.mark.asyncio
+async def test_overdraft_fee_dispute():
+    result = await scenario.run(
+        name="overdraft fee dispute and resolution - MiniMax",
+        description="""
+            Customer with a basic checking account notices an overdraft fee and wants
+            it reversed. Tests empathy, account investigation, and fee resolution.
+        """,
+        agents=[
+            BankSupportAgentAdapter(),
+            scenario.UserSimulatorAgent(model="openai/gpt-4o"),
+            scenario.JudgeAgent(
+                model="openai/gpt-4o",
+                criteria=[
+                    "Agent shows empathy for the customer's frustration about the fee",
+                    "Agent investigates the account to understand the overdraft situation",
+                    "Agent explains how the overdraft fee occurred",
+                    "Agent offers a resolution path (fee waiver, escalation, or explanation)",
+                    "Agent suggests ways to avoid future overdraft fees",
+                ]
+            ),
+        ],
+        script=[
+            scenario.user(
+                "I just saw a $35 overdraft fee on my account and I'm really upset. I had money in there! My customer ID is CUST_002."
+            ),
+            scenario.agent(),
+            scenario.user(
+                "This isn't fair. I've been a customer for 2 years and this is the first time this has happened. Can you waive the fee?"
+            ),
+            scenario.agent(),
+            scenario.judge(),
+        ],
+    )
+
+    _assert_success(result, "Overdraft fee dispute test")
 
 
 if __name__ == "__main__":

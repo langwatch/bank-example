@@ -8,6 +8,7 @@ from agno.agent import Agent
 from agno.models.openai import OpenAIChat
 from agno.models.nebius import Nebius
 from pydantic import BaseModel
+import agent_config
 
 dotenv.load_dotenv()
 
@@ -47,16 +48,9 @@ def create_summary_agent() -> Agent:
     """Create and return the summary agent"""
     return Agent(
         name="SummaryAgent",
-        # model=OpenAIChat(
-        #     id="gpt-4o-mini",
-        #     api_key=os.getenv("OPENAI_API_KEY"),
-        # ),
-        model=Nebius(
-            id="openai/gpt-oss-120b",
-            api_key=os.getenv("NEBIUS_API_KEY"),
-        ),
+        model=agent_config.get_model(),
         description=SUMMARY_SYSTEM_PROMPT,
-        add_history_to_context=False,  # Each call is independent
+        add_history_to_context=True,
     )
 
 def summarize_conversation(messages: List[Dict[str, Any]]) -> MessageSummary:
