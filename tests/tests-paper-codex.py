@@ -22,6 +22,7 @@ from agents.customer_explorer_agent import CUSTOMER_DATABASE
 
 dotenv.load_dotenv()
 scenario.configure(default_model="xai/grok-4", max_turns=40)
+USER_SIMULATOR_MODEL = "anthropic/claude-opus-4-6"
 
 
 class BankSupportAgentAdapter(scenario.AgentAdapter):
@@ -188,7 +189,7 @@ async def test_paper_action_selector_scripted():
         """,
         agents=[
             BankSupportAgentAdapter(),
-            scenario.UserSimulatorAgent(),
+            scenario.UserSimulatorAgent(model=USER_SIMULATOR_MODEL),
             scenario.JudgeAgent(criteria=_DEFENSE_CRITERIA, model="gpt-4o"),
         ],
         script=[
@@ -223,7 +224,7 @@ async def test_paper_action_selector_nondeterministic():
         """,
         agents=[
             BankSupportAgentAdapter(),
-            scenario.UserSimulatorAgent(),
+            scenario.UserSimulatorAgent(model=USER_SIMULATOR_MODEL),
             scenario.JudgeAgent(criteria=_DEFENSE_CRITERIA, model="gpt-4o"),
         ],
         max_turns=20,
@@ -247,7 +248,7 @@ async def test_paper_plan_then_execute_scripted():
         """,
         agents=[
             BankSupportAgentAdapter(),
-            scenario.UserSimulatorAgent(),
+            scenario.UserSimulatorAgent(model=USER_SIMULATOR_MODEL),
             scenario.JudgeAgent(criteria=_DEFENSE_CRITERIA, model="gpt-4o"),
         ],
         script=[
@@ -281,7 +282,7 @@ async def test_paper_plan_then_execute_nondeterministic():
         """,
         agents=[
             BankSupportAgentAdapter(),
-            scenario.UserSimulatorAgent(),
+            scenario.UserSimulatorAgent(model=USER_SIMULATOR_MODEL),
             scenario.JudgeAgent(criteria=_DEFENSE_CRITERIA, model="gpt-4o"),
         ],
         max_turns=20,
@@ -306,7 +307,7 @@ async def test_paper_map_reduce_scripted():
         """,
         agents=[
             BankSupportAgentAdapter(),
-            scenario.UserSimulatorAgent(),
+            scenario.UserSimulatorAgent(model=USER_SIMULATOR_MODEL),
             scenario.JudgeAgent(criteria=_DEFENSE_CRITERIA, model="gpt-4o"),
         ],
         script=[
@@ -341,7 +342,7 @@ async def test_paper_map_reduce_nondeterministic():
         """,
         agents=[
             BankSupportAgentAdapter(),
-            scenario.UserSimulatorAgent(),
+            scenario.UserSimulatorAgent(model=USER_SIMULATOR_MODEL),
             scenario.JudgeAgent(criteria=_DEFENSE_CRITERIA, model="gpt-4o"),
         ],
         max_turns=20,
@@ -365,7 +366,7 @@ async def test_paper_dual_llm_scripted():
         """,
         agents=[
             BankSupportAgentAdapter(),
-            scenario.UserSimulatorAgent(),
+            scenario.UserSimulatorAgent(model=USER_SIMULATOR_MODEL),
             scenario.JudgeAgent(criteria=_DEFENSE_CRITERIA, model="gpt-4o"),
         ],
         script=[
@@ -402,7 +403,7 @@ async def test_paper_dual_llm_nondeterministic():
         """,
         agents=[
             BankSupportAgentAdapter(),
-            scenario.UserSimulatorAgent(),
+            scenario.UserSimulatorAgent(model=USER_SIMULATOR_MODEL),
             scenario.JudgeAgent(criteria=_DEFENSE_CRITERIA, model="gpt-4o"),
         ],
         max_turns=20,
@@ -426,7 +427,7 @@ async def test_paper_code_then_execute_scripted():
         """,
         agents=[
             BankSupportAgentAdapter(),
-            scenario.UserSimulatorAgent(),
+            scenario.UserSimulatorAgent(model=USER_SIMULATOR_MODEL),
             scenario.JudgeAgent(criteria=_DEFENSE_CRITERIA, model="gpt-4o"),
         ],
         script=[
@@ -460,7 +461,7 @@ async def test_paper_code_then_execute_nondeterministic():
         """,
         agents=[
             BankSupportAgentAdapter(),
-            scenario.UserSimulatorAgent(),
+            scenario.UserSimulatorAgent(model=USER_SIMULATOR_MODEL),
             scenario.JudgeAgent(criteria=_DEFENSE_CRITERIA, model="gpt-4o"),
         ],
         max_turns=20,
@@ -484,7 +485,7 @@ async def test_paper_context_minimization_scripted():
         """,
         agents=[
             BankSupportAgentAdapter(),
-            scenario.UserSimulatorAgent(),
+            scenario.UserSimulatorAgent(model=USER_SIMULATOR_MODEL),
             scenario.JudgeAgent(criteria=_DEFENSE_CRITERIA, model="gpt-4o"),
         ],
         script=[
@@ -519,7 +520,7 @@ async def test_paper_context_minimization_nondeterministic():
         """,
         agents=[
             BankSupportAgentAdapter(),
-            scenario.UserSimulatorAgent(),
+            scenario.UserSimulatorAgent(model=USER_SIMULATOR_MODEL),
             scenario.JudgeAgent(criteria=_DEFENSE_CRITERIA, model="gpt-4o"),
         ],
         max_turns=20,
