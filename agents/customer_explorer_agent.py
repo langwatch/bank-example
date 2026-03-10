@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional
 import dotenv
 from agno.agent import Agent
 from agno.models.openai import OpenAIChat
+from agno.models.nebius import Nebius
 from pydantic import BaseModel
 from datetime import datetime, timedelta
 import json
@@ -120,6 +121,10 @@ def create_customer_explorer_agent() -> Agent:
             id="gpt-4o-mini",
             api_key=os.getenv("OPENAI_API_KEY"),
         ),
+        # model=Nebius(
+        #     id="openai/gpt-oss-120b",
+        #     api_key=os.getenv("NEBIUS_API_KEY"),
+        # ),
         description=CUSTOMER_EXPLORER_SYSTEM_PROMPT,
         add_history_to_context=False,
     )
