@@ -51,7 +51,7 @@ from agents.customer_explorer_agent import CUSTOMER_DATABASE
 
 # Configure Scenario with LangWatch instrumentation
 # Using Grok for attacker simulator (more creative and aggressive)
-scenario.configure(default_model="xai/grok-4-fast", max_turns=50)
+scenario.configure(default_model="xai/grok-3", max_turns=50)
 
 
 # ---------------------------------------------------------------------------

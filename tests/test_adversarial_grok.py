@@ -46,7 +46,7 @@ from agents.customer_explorer_agent import CUSTOMER_DATABASE
 
 # Configure Scenario with LangWatch instrumentation
 # Using Grok for attacker simulator (more creative and aggressive)
-scenario.configure(default_model="xai/grok-4-fast", max_turns=20)
+scenario.configure(default_model="xai/grok-3", max_turns=20)
 
 
 # ---------------------------------------------------------------------------
@@ -1511,7 +1511,7 @@ class TAPOrchestrator:
     def __init__(
         self,
         goal: str,
-        attacker_model: str = "xai/grok-4-fast",
+        attacker_model: str = "xai/grok-3",
         evaluator_model: str = "gpt-4o",
         max_depth: int = 4,
         branching_factor: int = 3,
@@ -1808,7 +1808,7 @@ class PAIRAttacker:
     def __init__(
         self,
         goal: str,
-        attacker_model: str = "xai/grok-4-fast",
+        attacker_model: str = "xai/grok-3",
         evaluator_model: str = "gpt-4o",
         max_iterations: int = 10,
         plateau_patience: int = 3,

@@ -24,7 +24,7 @@ from main_support_agent import support_agent
 from agents.customer_explorer_agent import CUSTOMER_DATABASE
 
 dotenv.load_dotenv()
-scenario.configure(default_model="xai/grok-4", max_turns=40)
+scenario.configure(default_model="xai/grok-3", max_turns=40)
 
 
 class BankSupportAgentAdapter(scenario.AgentAdapter):
